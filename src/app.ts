@@ -5,6 +5,9 @@ import helmet from "helmet";
 import { LRUCache } from "./utils/LRUCache";
 import { mockUsers } from "./data/mockUsers";
 
+import { rateLimiter } from "./middleware/rateLimiter";
+import { getUser } from "./controllers/userController";
+
 // Create cache: 100 entries max, TTL 60s
 export const userCache = new LRUCache<string, any>(100, 60);
 
@@ -48,6 +51,14 @@ export function createApp(): Express {
     );
     next();
   });
+
+  // Apply globally
+  //test ratelimiter
+  //Test burst capacity (5 requests / 10s)
+  //for i in {1..6}; do curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3000/users/1; done
+  //Test per-minute quota (10 requests/min)
+  //for i in {1..11}; do curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3000/users/2; done
+  app.use(rateLimiter);
 
   // health check
   app.get("/health", (_req: Request, res: Response) => {
@@ -168,6 +179,8 @@ export function createApp(): Express {
       pendingFetches.delete(userId);
     }
   });
+
+  app.get("/users/:id", rateLimiter, getUser);
 
   return app;
 }
